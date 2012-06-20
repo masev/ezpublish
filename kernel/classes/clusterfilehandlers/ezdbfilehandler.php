@@ -2,7 +2,7 @@
 /**
  * File containing the eZDBFileHandler class.
  *
- * @copyright Copyright (C) 1999-2011 eZ Systems AS. All rights reserved.
+ * @copyright Copyright (C) 1999-2012 eZ Systems AS. All rights reserved.
  * @license http://www.gnu.org/licenses/gpl-2.0.txt GNU General Public License v2
  * @version //autogentag//
  * @package kernel
@@ -49,7 +49,7 @@ class eZDBFileHandler implements ezpDatabaseBasedClusterFileHandler
 
             // connection failed
             if( self::$dbbackend->db === false )
-                throw new eZDBNoConnectionException( self::$dbbackend->dbparams['host'] );
+                throw new eZClusterHandlerDBNoConnectionException( self::$dbbackend->dbparams['host'], self::$dbbackend->dbparams['user'], self::$dbbackend->dbparams['pass'] );
         }
 
         $this->filePath = $filePath;
@@ -61,6 +61,7 @@ class eZDBFileHandler implements ezpDatabaseBasedClusterFileHandler
             unset( $fileINI );
         }
         $this->nonExistantStaleCacheHandling = $GLOBALS['eZDBFileHandler_Settings']['NonExistantStaleCacheHandling'];
+        $this->filePermissionMask = octdec( eZINI::instance()->variable( 'FileSettings', 'StorageFilePermissions' ) );
     }
 
     /**
@@ -207,7 +208,11 @@ class eZDBFileHandler implements ezpDatabaseBasedClusterFileHandler
         $filePath = eZDBFileHandler::cleanPath( $filePath );
         eZDebugSetting::writeDebug( 'kernel-clustering', "db::fileFetch( '$filePath' )" );
 
-        return self::$dbbackend->_fetch( $filePath );
+        $fetchReturn = self::$dbbackend->_fetch( $filePath );
+
+        $this->fixPermissions( $filePath );
+
+        return $fetchReturn;
     }
 
     /**
@@ -769,9 +774,7 @@ class eZDBFileHandler implements ezpDatabaseBasedClusterFileHandler
     /**
      * Fetches file from db and saves it in FS under unique name.
      *
-     * \public
-     * \static
-     * \return filename with path of a saved file. You can use this filename to get contents of file from filesystem.
+     * @return string filename with path of a saved file. You can use this filename to get contents of file from filesystem.
      */
     function fetchUnique( )
     {
@@ -803,6 +806,8 @@ class eZDBFileHandler implements ezpDatabaseBasedClusterFileHandler
             eZDebugSetting::writeDebug( 'kernel-clustering', "db::fetch( '$filePath' )" );
             self::$dbbackend->_fetch( $filePath );
         }
+
+        $this->fixPermissions( $filePath );
     }
 
     /**
@@ -931,7 +936,7 @@ class eZDBFileHandler implements ezpDatabaseBasedClusterFileHandler
         }
         $commonPath = eZDBFileHandler::cleanPath( $commonPath );
         $commonSuffix = eZDBFileHandler::cleanPath( $commonSuffix );
-        eZDebugSetting::writeDebug( 'kernel-clustering', "db::fileDeleteByDirList( '$dirList', '$commonPath', '$commonSuffix' )" );
+        eZDebugSetting::writeDebug( 'kernel-clustering', "db::fileDeleteByDirList( '" . join( ", ", $dirList ) . "', '$commonPath', '$commonSuffix' )" );
 
         self::$dbbackend->_deleteByDirList( $dirList, $commonPath, $commonSuffix );
     }
@@ -1075,29 +1080,19 @@ class eZDBFileHandler implements ezpDatabaseBasedClusterFileHandler
     /**
      * Outputs file contents prepending them with appropriate HTTP headers.
      *
-     * @deprecated This function should not be used since it cannot handle reading errors.
-     *             For the PHP 5 port this should be removed.
+     * @param int $offset Transfer start offset
+     * @param int $length Transfer length
+     *
+     * @return void
      */
-    function passthrough()
+    function passthrough( $offset = 0, $length = false )
     {
-        $path = $this->filePath;
-        eZDebugSetting::writeDebug( 'kernel-clustering', "db::passthrough( '$path' )" );
+        $fname = "db::passthrough( '{$this->filePath}' )";
+        eZDebugSetting::writeDebug( 'kernel-clustering', $fname );
         if ( $this->metaData === null )
             $this->loadMetaData();
-        $size = $this->metaData['size'];
-        $mimeType = $this->metaData['datatype'];
-        $mtime = $this->metaData['mtime'];
-        $mdate = gmdate( 'D, d M Y H:i:s T', $mtime );
 
-        header( "Content-Length: $size" );
-        header( "Content-Type: $mimeType" );
-        header( "Last-Modified: $mdate GMT" );
-        header( "Expires: ". gmdate('D, d M Y H:i:s', time() + 6000) . ' GMT');
-        header( "Connection: close" );
-        header( "X-Powered-By: eZ Publish" );
-        header( "Accept-Ranges: bytes" );
-
-        self::$dbbackend->_passThrough( $path );
+        self::$dbbackend->_passThrough( $this->filePath, $offset, $length, $fname );
     }
 
     /**
@@ -1283,11 +1278,11 @@ class eZDBFileHandler implements ezpDatabaseBasedClusterFileHandler
      * Determines the cache type based on the path
      * @return string viewcache, cacheblock or misc
      */
-    protected function _cacheType()
+    protected function computeCacheType()
     {
-        if ( strstr( $this->filePath, 'cache/content' ) !== false )
+        if ( strpos( $this->filePath, 'cache/content' ) !== false )
             return 'viewcache';
-        elseif ( strstr( $this->filePath, 'cache/template-block' ) !== false )
+        elseif ( strpos( $this->filePath, 'cache/template-block' ) !== false )
             return 'cacheblock';
         else
             return 'misc';
@@ -1303,9 +1298,9 @@ class eZDBFileHandler implements ezpDatabaseBasedClusterFileHandler
             case 'cacheType':
             {
                 static $cacheType = null;
-                if ( $cacheType == null )
-                    $cacheType = $this->_cacheType();
-                return $cacheType;
+                if ( $this->_cacheType == null )
+                    $this->_cacheType = $this->computeCacheType();
+                return $this->_cacheType;
             } break;
 
             case 'metaData':
@@ -1384,6 +1379,17 @@ class eZDBFileHandler implements ezpDatabaseBasedClusterFileHandler
         return self::$dbbackend->expiredFilesList( $scopes, $limit, $expiry );
     }
 
+    public function hasStaleCacheSupport()
+    {
+        return true;
+    }
+
+    protected function fixPermissions( $filePath )
+    {
+        if ( file_exists( $filePath ) )
+            chmod( $filePath, $this->filePermissionMask );
+    }
+
     /**
      * Database backend class
      * @var eZDBFileHandlerMysqlBackend
@@ -1445,6 +1451,18 @@ class eZDBFileHandler implements ezpDatabaseBasedClusterFileHandler
      * @var int
      */
     protected $generationStartTimestamp = false;
+
+    /**
+     * Type of cache file, used by the nameTrunk feature to determine how nametrunk is computed
+     * @var string
+     */
+    protected $_cacheType;
+
+    /**
+     * Permission mask that must be applied to created files
+     * @var int
+     */
+    private $filePermissionMask;
 
 }
 ?>

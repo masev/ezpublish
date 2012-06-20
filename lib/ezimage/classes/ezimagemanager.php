@@ -2,7 +2,7 @@
 /**
  * File containing the eZImageManager class.
  *
- * @copyright Copyright (C) 1999-2011 eZ Systems AS. All rights reserved.
+ * @copyright Copyright (C) 1999-2012 eZ Systems AS. All rights reserved.
  * @license http://www.gnu.org/licenses/gpl-2.0.txt GNU General Public License v2
  * @version //autogentag//
  * @package lib
@@ -940,6 +940,11 @@ class eZImageManager
                     ezpEvent::getInstance()->filter( 'image/alias', array( 'alias_url' => $currentAliasData['url'],
                                                                            'alias_name' => $currentAliasData['name'] ) );
 
+                    // Notify about image alias generation. Parameters are alias
+                    // url and alias name.
+                    ezpEvent::getInstance()->notify( 'image/alias', array( $currentAliasData['url'],
+                                                                           $currentAliasData['name'] ) );
+                    
                     return true;
                 }
                 // conversion failed, we abort generation
@@ -1231,6 +1236,10 @@ class eZImageManager
                         $result = false;
                         break;
                     }
+                    // store the converted file to cluster if the conversion is between mime name
+                    $fileHandler = eZClusterFileHandler::instance();
+                    $fileHandler->fileStore( $nextMimeData['url'], 'image', false, $nextMimeData['name']  );
+
                     $currentMimeData = $nextMimeData;
                 }
                 $filters = $leftoverFilters;

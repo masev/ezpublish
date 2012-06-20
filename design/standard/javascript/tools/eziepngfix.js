@@ -4,7 +4,7 @@
 // ## BEGIN COPYRIGHT, LICENSE AND WARRANTY NOTICE ##
 // SOFTWARE NAME: eZ Publish
 // SOFTWARE RELEASE: 4.1.x
-// COPYRIGHT NOTICE: Copyright (C) 1999-2011 eZ Systems AS
+// COPYRIGHT NOTICE: Copyright (C) 1999-2012 eZ Systems AS
 // SOFTWARE LICENSE: GNU General Public License v2.0
 // NOTICE: >
 //   This program is free software; you can redistribute it and/or
@@ -24,29 +24,29 @@
 //
 // ## END COPYRIGHT, LICENSE AND WARRANTY NOTICE ##
 //
-            
+
 /*! \file eziepngfix.js
 */
 
 
 /*!
   Forces use of DirectX transparency filter for image tags with
-  "transparent-png-icon" as class. The result: correct alpha 
+  "transparent-png-icon" as class. The result: correct alpha
   blending for normal (32x32) PNG icons in Internet Explorer.
 */
 function useDirectXAlphaBlender()
 {
     var images = document.getElementsByTagName( "img" );
 
-    for( var i=0; i<images.length; i++ )
+    for ( var i=0; i<images.length; i++ )
     {
         var image = images[i];
-        if( image.className == "transparent-png-icon" )
+        if ( image.className == "transparent-png-icon" )
         {
             image.runtimeStyle.filter = "progid:DXImageTransform.Microsoft.AlphaImageLoader(src='" + image.src + "', sizingMethod='scale')";
-            
-            if( image.width == 16 )
-            {           
+
+            if ( image.width == 16 )
+            {
                 image.src = emptyIcon16;
             }
             else

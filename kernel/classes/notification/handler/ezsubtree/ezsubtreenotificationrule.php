@@ -2,7 +2,7 @@
 /**
  * File containing the eZSubtreeNotificationRule class.
  *
- * @copyright Copyright (C) 1999-2011 eZ Systems AS. All rights reserved.
+ * @copyright Copyright (C) 1999-2012 eZ Systems AS. All rights reserved.
  * @license http://www.gnu.org/licenses/gpl-2.0.txt GNU General Public License v2
  * @version //autogentag//
  * @package kernel
@@ -498,6 +498,18 @@ class eZSubtreeNotificationRule extends eZPersistentObject
                         return array();
                     }
                 } break;
+                default:
+                {
+                    //check object state group limitation
+                    if ( strncmp( $key, 'StateGroup_', 11 ) === 0 )
+                    {
+                        if ( count( array_intersect( $limitationArray[$key],
+                                                     $contentObject->attribute( 'state_id_array' ) ) ) == 0 )
+                        {
+                            return array();
+                        }
+                    }
+                }
             }
         }
 

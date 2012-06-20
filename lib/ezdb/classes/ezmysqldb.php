@@ -2,7 +2,7 @@
 /**
  * File containing the eZMySQLDB class.
  *
- * @copyright Copyright (C) 1999-2011 eZ Systems AS. All rights reserved.
+ * @copyright Copyright (C) 1999-2012 eZ Systems AS. All rights reserved.
  * @license http://www.gnu.org/licenses/gpl-2.0.txt GNU General Public License v2
  * @version //autogentag//
  * @package lib
@@ -40,6 +40,8 @@ class eZMySQLDB extends eZDBInterface
             return;
         }
 
+        eZDebug::createAccumulatorGroup( 'mysql_total', 'Mysql Total' );
+
         /// Connect to master server
         if ( !$this->DBWriteConnection )
         {
@@ -71,8 +73,6 @@ class eZMySQLDB extends eZDBInterface
 
         // Initialize TempTableList
         $this->TempTableList = array();
-
-        eZDebug::createAccumulatorGroup( 'mysql_total', 'Mysql Total' );
     }
 
     /*!
@@ -115,6 +115,7 @@ class eZMySQLDB extends eZDBInterface
         {
             sleep( $waitTime );
             $oldHandling = eZDebug::setHandleType( eZDebug::HANDLE_EXCEPTION );
+            eZDebug::accumulatorStart( 'mysql_connection', 'mysql_total', 'Database connection' );
             try {
                 if ( $this->UsePersistentConnection == true )
                 {
@@ -125,6 +126,7 @@ class eZMySQLDB extends eZDBInterface
                     $connection = mysql_connect( $this->Server, $this->User, $this->Password );
                 }
             } catch( ErrorException $e ) {}
+            eZDebug::accumulatorStop( 'mysql_connection' );
             eZDebug::setHandleType( $oldHandling );
             $numAttempts++;
         }
@@ -204,6 +206,7 @@ class eZMySQLDB extends eZDBInterface
 
         if ( is_array( $charset ) )
         {
+            $realCharset = array();
             foreach ( $charset as $charsetItem )
                 $realCharset[] = eZCharsetInfo::realCharsetCode( $charsetItem );
         }
@@ -336,8 +339,8 @@ class eZMySQLDB extends eZDBInterface
                         }
                     }
 
-                    $analysisText = '';
                     $delimiterLine = array();
+                    $colLine = array();
                     // Generate the column line and the vertical delimiter
                     // The look of the table is taken from the MySQL CLI client
                     // It looks like this:
@@ -366,8 +369,8 @@ class eZMySQLDB extends eZDBInterface
                             $size = $col['size'];
                             $data = isset( $row[$name] ) ? $row[$name] : '';
                             // Align numerical values to the right (ie. pad left)
-                            $rowLine[] = ' ' . str_pad( $row[$name], $size, ' ',
-                                                        is_numeric( $row[$name] ) ? STR_PAD_LEFT : STR_PAD_RIGHT ) . ' ';
+                            $rowLine[] = ' ' . str_pad( $data, $size, ' ',
+                                                        is_numeric( $data ) ? STR_PAD_LEFT : STR_PAD_RIGHT ) . ' ';
                         }
                         $analysisText .= '|' . join( '|', $rowLine ) . "|\n";
                         $analysisText .= $delimiterLine;
@@ -915,9 +918,6 @@ class eZMySQLDB extends eZDBInterface
         {
             return false;
         }
-
-        $dbServerVersion = $this->databaseServerVersion();
-        $dbServerMainVersion = $dbServerVersion['values'][0];
 
         while ( $i < $numRows )
         {

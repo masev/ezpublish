@@ -2,7 +2,7 @@
 /**
  * File containing the rest bootstrap
  *
- * @copyright Copyright (C) 1999-2011 eZ Systems AS. All rights reserved.
+ * @copyright Copyright (C) 1999-2012 eZ Systems AS. All rights reserved.
  * @license http://www.gnu.org/licenses/gpl-2.0.txt GNU General Public License v2
  * @version //autogentag//
  * @package kernel
@@ -40,6 +40,10 @@ $access = eZSiteAccess::change( $access );
 // load siteaccess extensions
 eZExtension::activateExtensions( 'access' );
 
+// Now that all extensions are activated and siteaccess has been changed, reset
+// all eZINI instances as they may not take into account siteaccess specific settings.
+eZINI::resetAllInstances( false );
+
 if( ezpRestDebug::isDebugEnabled() )
 {
     $debug = ezpRestDebug::getInstance();
@@ -49,6 +53,6 @@ if( ezpRestDebug::isDebugEnabled() )
 
 $mvcConfig = new ezpMvcConfiguration();
 
-$frontController = new ezcMvcConfigurableDispatcher( $mvcConfig );
+$frontController = new ezpMvcConfigurableDispatcher( $mvcConfig );
 $frontController->run();
 ?>

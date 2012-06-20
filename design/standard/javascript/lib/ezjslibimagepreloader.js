@@ -4,7 +4,7 @@
 // ## BEGIN COPYRIGHT, LICENSE AND WARRANTY NOTICE ##
 // SOFTWARE NAME: eZ Publish
 // SOFTWARE RELEASE: 4.1.x
-// COPYRIGHT NOTICE: Copyright (C) 1999-2011 eZ Systems AS
+// COPYRIGHT NOTICE: Copyright (C) 1999-2012 eZ Systems AS
 // SOFTWARE LICENSE: GNU General Public License v2.0
 // NOTICE: >
 //   This program is free software; you can redistribute it and/or
@@ -46,7 +46,7 @@ eZImagePreloader.prototype.preloadImageList = function( imageList )
     this.nLoadedImagesCount     = 0;
     this.bPreloadDone           = false;
 
-    for( var i in imageList )
+    for ( var i in imageList )
     {
         if ( typeof imageList[i] != 'function' )
         {
@@ -102,7 +102,7 @@ eZImagePreloader.prototype.onImageAbort = function()
 eZImagePreloader.prototype.onComplete = function( imageList )
 {
     this.nProcessedImagesCount++;
-    if( this.nProcessedImagesCount == this.nImagesCount )
+    if ( this.nProcessedImagesCount == this.nImagesCount )
     {
         this.bPreloadDone = true;
     }

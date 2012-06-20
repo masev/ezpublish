@@ -2,7 +2,7 @@
 /**
  * File containing the eZRole class.
  *
- * @copyright Copyright (C) 1999-2011 eZ Systems AS. All rights reserved.
+ * @copyright Copyright (C) 1999-2012 eZ Systems AS. All rights reserved.
  * @license http://www.gnu.org/licenses/gpl-2.0.txt GNU General Public License v2
  * @version //autogentag//
  * @package kernel
@@ -885,16 +885,22 @@ class eZRole extends eZPersistentObject
                                                     $asObject );
     }
 
-    /*!
-     \static
-     \return the number of roles in the database.
-    */
-    static function roleCount()
+    /**
+     * Fetches the count of created roles
+     *
+     * @static
+     * @param boolean $ignoreNew Wether to ignore draft roles
+     *
+     * @return int
+     */
+    static function roleCount( $ignoreNew = true )
     {
-        $db = eZDB::instance();
-
-        $countArray = $db->arrayQuery(  "SELECT count( * ) AS count FROM ezrole WHERE version=0" );
-        return $countArray[0]['count'];
+        $conds = array( 'version' => 0 );
+        if ( $ignoreNew === true )
+        {
+            $conds['is_new'] = 0;
+        }
+        return eZPersistentObject::count( eZRole::definition(), $conds );
     }
 
     /*!
